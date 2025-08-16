@@ -1,0 +1,14 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Production: cloisonner par utilisateur
+    match /users/{uid}/invoices/{itemId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Pour développement local avec émulateur: on peut assouplir via VITE_USE_FIREBASE_EMULATORS
+    // Les émulateurs n'appliquent pas ces règles distantes; elles se configurent côté émulateur.
+  }
+}
+
+

@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* Neutraliser l'autofill navigateur pour rester cohérent en sombre */
+input.auth-input:-webkit-autofill,
+input.auth-input:-webkit-autofill:hover,
+input.auth-input:-webkit-autofill:focus,
+textarea.auth-input:-webkit-autofill,
+select.auth-input:-webkit-autofill {
+  -webkit-text-fill-color: theme(colors.slate.100) !important;
+  -webkit-box-shadow: 0 0 0px 1000px theme(colors.slate.900) inset !important;
+  transition: background-color 9999s ease-in-out 0s;
+}
+/* Variante claire */
+.dark input.auth-input:-webkit-autofill {
+  -webkit-text-fill-color: theme(colors.slate.100) !important;
+  -webkit-box-shadow: 0 0 0px 1000px theme(colors.slate.900) inset !important;
+}
+input.auth-input:-webkit-autofill {
+  -webkit-text-fill-color: theme(colors.slate.900) !important;
+  -webkit-box-shadow: 0 0 0px 1000px theme(colors.white) inset !important;
+}
+
+/* Focus rings plus visibles */
+.auth-input:focus-visible {
+  outline: none;
+}
+.auth-input:focus {
+  box-shadow: 0 0 0 2px theme(colors.sky.500 / 0.4);
+}
+.dark .auth-input:focus {
+  box-shadow: 0 0 0 2px theme(colors.indigo.500 / 0.35);
+}
+
+/* Subtle noise overlay for light theme */
+.noise-light {
+  background-image: radial-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+    radial-gradient(rgba(0, 0, 0, 0.015) 1px, transparent 1px);
+  background-size: 3px 3px, 5px 5px;
+  background-position: 0 0, 1px 1px;
+}
+.dark .noise-light {
+  background-image: none;
+}
