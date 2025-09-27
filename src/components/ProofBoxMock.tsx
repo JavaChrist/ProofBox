@@ -8,7 +8,6 @@ import {
   ChevronDown,
   CreditCard,
   Package,
-  ShieldCheck,
   Wifi,
   Phone,
   Tv2,
@@ -18,12 +17,15 @@ import {
   Sun,
   Moon,
   Trash2,
-  Paperclip
+  Paperclip,
+  LogOut,
+  X
 } from "lucide-react";
 import { uploadInvoiceFile, deleteFileByPath } from "../lib/files";
+import { ensureNotificationPermission, scheduleLocalNotification, showLocalNotification } from "../lib/notify";
 import { useAuth } from "../lib/auth";
 import { useTheme } from "../lib/theme";
-import { subscribeItems, setItem as setDbItem, updateItemPartial as updateDbItem, deleteItem as deleteDbItem, type DBItem } from "../lib/db";
+import { subscribeItems, setItem as setDbItem, updateItemPartial as updateDbItem, deleteItem as deleteDbItem, type DBItem, addReminder as addReminderDoc } from "../lib/db";
 
 // ---- Helpers
 function parseDateFlexible(input?: string): Date | undefined {
@@ -183,7 +185,9 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
       <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-base font-semibold">{title}</h3>
-          <button onClick={onClose} className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-sm">Fermer</button>
+          <button onClick={onClose} className="inline-flex items-center justify-center w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800" aria-label="Fermer">
+            <X className="w-4 h-4" />
+          </button>
         </div>
         {children}
       </div>
@@ -345,6 +349,15 @@ export default function ProofBoxMock() {
     setDraft({ title: "", provider: "", category: "", amount: "", purchase: "", duration: "24" });
   }, [showNew]);
 
+  // Masquer la fiche sélectionnée si on change d'onglet (type différent)
+  useEffect(() => {
+    setSelected((sel) => {
+      if (!sel) return sel;
+      const tabType = tab === "warranties" ? "warranty" : "subscription";
+      return sel.type === tabType ? sel : null;
+    });
+  }, [tab]);
+
   const filtered = useMemo(() => {
     const type = tab === "warranties" ? "warranty" : "subscription";
     return items
@@ -447,11 +460,12 @@ export default function ProofBoxMock() {
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">/</span>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => setShowNew("warranty")} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-sky-600 text-white text-sm hover:brightness-110 shadow-sm">
-                  <Plus className="w-4 h-4" /> Garantie
-                </button>
-                <button onClick={() => setShowNew("subscription")} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-fuchsia-600 to-rose-600 text-white text-sm hover:brightness-110 shadow-sm">
-                  <Plus className="w-4 h-4" /> Abonnement
+                {/* Bouton Ajouter unique (desktop/tablette). En mobile, on garde le FAB. */}
+                <button
+                  onClick={() => setShowNew(tab === "warranties" ? "warranty" : "subscription")}
+                  className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 via-sky-500 to-rose-500 text-white text-sm hover:brightness-110 shadow-sm"
+                >
+                  <Plus className="w-4 h-4" /> Ajouter
                 </button>
                 <SignOutButton />
               </div>
@@ -498,7 +512,7 @@ export default function ProofBoxMock() {
                 />
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-medium text-indigo-600 dark:text-indigo-300">État</span>
               {(["all", "active", "endsSoon", "expired", "canceled", "overdue"] as const).map((s) => (
                 <ChipButton key={s} active={statusFilter === s} onClick={() => setStatusFilter(s as any)} color={tab === "warranties" ? "indigo" : "fuchsia"}>
@@ -508,13 +522,6 @@ export default function ProofBoxMock() {
             </div>
             <div className="flex items-center gap-2 ml-auto">
               <span className="text-xs font-medium text-sky-600 dark:text-sky-300">Catégorie</span>
-              <div className="relative">
-                <button className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:border-slate-700 dark:ring-slate-700">
-                  <FilterIcon />
-                  <span>{categoryFilter}</span>
-                  <ChevronDown className="w-4 h-4 text-slate-400" />
-                </button>
-              </div>
               <select
                 className="px-2 py-1.5 text-sm rounded-xl bg-white border border-slate-300 ring-1 ring-slate-200 dark:bg-slate-900 dark:border-slate-700 dark:ring-slate-700"
                 value={categoryFilter}
@@ -632,6 +639,9 @@ export default function ProofBoxMock() {
                     <h3 className="font-semibold leading-tight">{selected.title}</h3>
                     <p className="text-sm text-slate-500 dark:text-slate-400">{selected.provider} · {selected.category}</p>
                   </div>
+                  <button onClick={() => setSelected(null)} className="inline-flex items-center justify-center w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800" aria-label="Fermer">
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
 
                 <div className="mt-4 space-y-2 text-sm">
@@ -682,7 +692,7 @@ export default function ProofBoxMock() {
         {/* Mobile FAB */}
         <button
           onClick={() => setShowNew(tab === "warranties" ? "warranty" : "subscription")}
-          className="fixed bottom-6 right-6 md:hidden inline-flex items-center gap-2 px-4 py-3 rounded-full shadow-lg text-white bg-gradient-to-r from-indigo-600 to-fuchsia-600"
+          className="fixed bottom-6 right-6 md:hidden inline-flex items-center gap-2 px-4 py-3 rounded-full shadow-lg text-white bg-gradient-to-r from-indigo-600 via-sky-500 to-rose-500"
         >
           <Plus className="w-4 h-4" /> Ajouter
         </button>
@@ -740,8 +750,8 @@ export default function ProofBoxMock() {
         {editing && (
           <EditModal
             item={editing}
-            onCancel={() => setEditing(null)}
-            onSave={(upd) => { updateItem(upd); setEditing(null); }}
+            onCancel={() => { setEditing(null); setSelected(null); }}
+            onSave={(upd) => { updateItem(upd); setEditing(null); setSelected(null); }}
           />
         )}
 
@@ -760,6 +770,16 @@ export default function ProofBoxMock() {
             onClose={() => setRemindFor(null)}
           />
         )}
+
+        {/* Desktop bottom add button (centered) */}
+        <div className="hidden md:flex max-w-6xl mx-auto px-4 pb-6 justify-center">
+          <button
+            onClick={() => setShowNew(tab === "warranties" ? "warranty" : "subscription")}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-white bg-gradient-to-r from-indigo-600 via-sky-500 to-rose-500 shadow-md hover:brightness-110"
+          >
+            <Plus className="w-4 h-4" /> Ajouter
+          </button>
+        </div>
 
         {toDelete && (
           <Modal title="Supprimer" onClose={() => setToDelete(null)}>
@@ -785,9 +805,7 @@ export default function ProofBoxMock() {
           </Modal>
         )}
 
-        <footer className="max-w-6xl mx-auto px-4 pb-10 text-center text-xs text-slate-400 dark:text-slate-500">
-          Maquette interactive (UI/UX) — couleurs par catégorie, barres de progression, boutons dégradés, panneau détail & création rapide. Icônes 100% lucide-react.
-        </footer>
+
       </div>
     </div>
   );
@@ -833,7 +851,8 @@ function SignOutButton() {
   const { signOut } = useAuth();
   return (
     <button onClick={signOut as any} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-slate-200 to-slate-300 text-slate-800 text-sm hover:brightness-110 shadow-sm dark:from-slate-700 dark:to-slate-800 dark:text-slate-100">
-      Déconnexion
+      <span className="hidden sm:inline">Déconnexion</span>
+      <LogOut className="w-4 h-4 sm:ml-0" />
     </button>
   );
 }
@@ -911,8 +930,25 @@ function ReminderModal({ item, onUpdate, onClose }: { item: BaseItem; onUpdate: 
     if (!when) return;
     const next: ReminderRef = { dateISO: new Date(when).toISOString(), note: note || undefined };
     onUpdate({ ...item, reminders: [...reminders, next] });
+    // Notifications locales (meilleur effort quand l’app est ouverte)
+    const whenDate = new Date(when);
+    ensureNotificationPermission().then((ok) => {
+      if (!ok) return;
+      scheduleLocalNotification(whenDate, `Rappel: ${item.title}`, next.note);
+      if (whenDate.getTime() <= Date.now() + 2000) {
+        void showLocalNotification(`Rappel: ${item.title}`, next.note);
+      }
+    }).catch(() => { });
     setWhen("");
     setNote("");
+    // Persistance pour push (Cloud Functions)
+    try {
+      const at = new Date(next.dateISO).getTime();
+      if (Number.isFinite(at) && (window as any)?.proofboxUserId) {
+        const uid = (window as any).proofboxUserId as string;
+        void addReminderDoc(uid, { atMs: at, itemId: item.id, itemTitle: item.title, note: next.note });
+      }
+    } catch { }
   };
   const remove = (idx: number) => {
     const arr = reminders.slice();

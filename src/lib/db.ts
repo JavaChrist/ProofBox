@@ -31,6 +31,18 @@ export type DBItem = {
   updatedAt?: any;
 };
 
+export type ReminderDoc = {
+  id?: string;
+  atMs: number;
+  userId: string;
+  itemId: string;
+  itemTitle: string;
+  note?: string;
+  sent?: boolean;
+  createdAt?: any;
+  sentAt?: any;
+};
+
 function itemsColRef(uid: string) {
   return collection(firebaseDb, "users", uid, "items");
 }
@@ -76,6 +88,26 @@ export async function updateItemPartial(uid: string, id: string, partial: Partia
 export async function deleteItem(uid: string, id: string): Promise<void> {
   const ref = doc(itemsColRef(uid), id);
   await deleteDoc(ref);
+}
+
+
+// FCM tokens
+import { setDoc as setDocRaw, doc as docRaw, collection as collectionRaw } from 'firebase/firestore';
+export async function saveFcmToken(uid: string, token: string): Promise<void> {
+  const ref = docRaw(collectionRaw(firebaseDb, 'users', uid, 'tokens'), token);
+  await setDocRaw(ref, { createdAt: serverTimestamp() }, { merge: true });
+}
+
+// Reminder documents for push scheduling
+export async function addReminder(uid: string, r: Omit<ReminderDoc, 'userId'>): Promise<void> {
+  const ref = docRaw(collectionRaw(firebaseDb, 'users', uid, 'reminders'));
+  const payload = pruneUndefined({
+    ...r,
+    userId: uid,
+    sent: false,
+    createdAt: serverTimestamp(),
+  } as any);
+  await setDocRaw(ref, payload);
 }
 
 

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { firebaseAuth } from "./firebase";
+import { initMessagingForUser } from "./messaging";
 import {
   onAuthStateChanged,
   createUserWithEmailAndPassword,
@@ -25,9 +26,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(firebaseAuth, (u) => {
+    const unsub = onAuthStateChanged(firebaseAuth, async (u) => {
       setUser(u);
       setLoading(false);
+      if (u?.uid) {
+        try { (window as any).proofboxUserId = u.uid; } catch { }
+        try { await initMessagingForUser(u.uid); } catch { }
+      } else {
+        try { delete (window as any).proofboxUserId; } catch { }
+      }
     });
     return () => unsub();
   }, []);
