@@ -60,17 +60,24 @@ export function subscribeItems(uid: string, cb: (items: DBItem[]) => void): Unsu
   });
 }
 
-function pruneUndefined<T extends Record<string, any>>(obj: T): T {
-  const out: Record<string, any> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (v === undefined) continue;
-    if (v && typeof v === 'object' && !Array.isArray(v)) {
-      out[k] = pruneUndefined(v as any);
-    } else {
-      out[k] = v;
-    }
+function pruneUndefined<T>(value: T): T {
+  if (value === undefined) return undefined as unknown as T;
+  if (value === null) return value;
+  if (Array.isArray(value)) {
+    const arr = (value as unknown as any[])
+      .filter((el) => el !== undefined)
+      .map((el) => (el && typeof el === 'object' ? pruneUndefined(el) : el));
+    return arr as unknown as T;
   }
-  return out as T;
+  if (typeof value === 'object') {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(value as Record<string, any>)) {
+      if (v === undefined) continue;
+      out[k] = v && typeof v === 'object' ? pruneUndefined(v) : v;
+    }
+    return out as unknown as T;
+  }
+  return value;
 }
 
 export async function setItem(uid: string, item: DBItem): Promise<void> {

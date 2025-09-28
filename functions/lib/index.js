@@ -1,11 +1,47 @@
-import { initializeApp } from 'firebase-admin/app';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { getMessaging } from 'firebase-admin/messaging';
-import * as functions from 'firebase-functions';
-initializeApp();
-const db = getFirestore();
-const messaging = getMessaging();
-export const sendDueRemindersV1 = functions
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.sendDueRemindersV1b = void 0;
+const app_1 = require("firebase-admin/app");
+const firestore_1 = require("firebase-admin/firestore");
+const messaging_1 = require("firebase-admin/messaging");
+const functions = __importStar(require("firebase-functions/v1"));
+(0, app_1.initializeApp)();
+const db = (0, firestore_1.getFirestore)();
+const messaging = (0, messaging_1.getMessaging)();
+exports.sendDueRemindersV1b = functions
     .region('us-central1')
     .pubsub.schedule('every 1 minutes')
     .timeZone('Europe/Paris')
@@ -37,7 +73,7 @@ export const sendDueRemindersV1 = functions
         const tokens = tokensSnap.docs.map(d => d.id).filter(Boolean);
         if (tokens.length === 0) {
             // marque comme sent pour éviter de boucler
-            docs.forEach(d => updates.push(d.ref.update({ sent: true, sentAt: FieldValue.serverTimestamp() })));
+            docs.forEach(d => updates.push(d.ref.update({ sent: true, sentAt: firestore_1.FieldValue.serverTimestamp() })));
             continue;
         }
         const messages = docs.map(d => {
@@ -58,7 +94,7 @@ export const sendDueRemindersV1 = functions
                 },
                 data: { url: '/' }
             });
-            updates.push(d.ref.update({ sent: true, sentAt: FieldValue.serverTimestamp() }));
+            updates.push(d.ref.update({ sent: true, sentAt: firestore_1.FieldValue.serverTimestamp() }));
         }
     }
     await Promise.allSettled(updates);

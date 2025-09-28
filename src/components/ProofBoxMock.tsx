@@ -39,6 +39,29 @@ function parseDateFlexible(input?: string): Date | undefined {
   return isNaN(d.getTime()) ? undefined : d;
 }
 
+// Accepte "YYYY-MM-DDTHH:mm" (datetime-local) et "dd/mm/yyyy HH:mm"
+function parseDateTimeFlexible(input: string): Date | undefined {
+  if (!input) return undefined;
+  // datetime-local exact, interprété en heure locale
+  const m1 = input.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})$/);
+  if (m1) {
+    const [, y, mo, d, h, mi] = m1.map(Number) as unknown as number[];
+    return new Date(y as number, (mo as number) - 1, d as number, h as number, mi as number, 0);
+  }
+  // format saisi manuellement: dd/mm/yyyy HH:mm (ou sans heure)
+  const m2 = input.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?$/);
+  if (m2) {
+    const dd = parseInt(m2[1], 10);
+    const mm = parseInt(m2[2], 10);
+    const yy = parseInt(m2[3], 10);
+    const hh = m2[4] ? parseInt(m2[4], 10) : 9;
+    const mi = m2[5] ? parseInt(m2[5], 10) : 0;
+    return new Date(yy, mm - 1, dd, hh, mi, 0);
+  }
+  const d = new Date(input);
+  return isNaN(d.getTime()) ? undefined : d;
+}
+
 const fmt = (d?: string) => {
   const parsed = parseDateFlexible(d);
   return parsed ? parsed.toLocaleDateString() : "—";
@@ -323,6 +346,9 @@ export default function ProofBoxMock() {
   const updateItem = async (updated: BaseItem) => {
     setItems(prev => prev.map(it => it.id === updated.id ? updated : it));
     setSelected(sel => (sel && sel.id === updated.id ? updated : sel));
+    // garder les modales synchronisées avec l'élément mis à jour
+    setRemindFor(cur => (cur && cur.id === updated.id ? updated : cur));
+    setDocsFor(cur => (cur && cur.id === updated.id ? updated : cur));
     if (user?.uid) await setDbItem(user.uid, updated as unknown as DBItem);
   };
 
@@ -928,22 +954,26 @@ function ReminderModal({ item, onUpdate, onClose }: { item: BaseItem; onUpdate: 
   const reminders = item.reminders ?? [];
   const add = () => {
     if (!when) return;
-    const next: ReminderRef = { dateISO: new Date(when).toISOString(), note: note || undefined };
+    const dt = parseDateTimeFlexible(when);
+    if (!dt) return;
+    const iso = dt.toISOString();
+    const next: ReminderRef = { dateISO: iso, note: note || undefined };
     onUpdate({ ...item, reminders: [...reminders, next] });
     // Notifications locales (meilleur effort quand l’app est ouverte)
     const whenDate = new Date(when);
     ensureNotificationPermission().then((ok) => {
       if (!ok) return;
+      const whenDate = dt;
       scheduleLocalNotification(whenDate, `Rappel: ${item.title}`, next.note);
-      if (whenDate.getTime() <= Date.now() + 2000) {
+      if (whenDate.getTime() <= Date.now() + 60000) {
         void showLocalNotification(`Rappel: ${item.title}`, next.note);
       }
     }).catch(() => { });
-    setWhen("");
-    setNote("");
+    // ne pas vider tout de suite: laisser visible au moins jusqu'au refresh de Firestore
+    setTimeout(() => { setWhen(""); setNote(""); }, 150);
     // Persistance pour push (Cloud Functions)
     try {
-      const at = new Date(next.dateISO).getTime();
+      const at = dt.getTime();
       if (Number.isFinite(at) && (window as any)?.proofboxUserId) {
         const uid = (window as any).proofboxUserId as string;
         void addReminderDoc(uid, { atMs: at, itemId: item.id, itemTitle: item.title, note: next.note });

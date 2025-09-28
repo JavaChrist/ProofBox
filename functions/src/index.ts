@@ -1,13 +1,13 @@
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
-import * as functions from 'firebase-functions';
+import * as functions from 'firebase-functions/v1';
 
 initializeApp();
 const db = getFirestore();
 const messaging = getMessaging();
 
-export const sendDueRemindersV1 = functions
+export const sendDueRemindersV1b = functions
   .region('us-central1')
   .pubsub.schedule('every 1 minutes')
   .timeZone('Europe/Paris')
